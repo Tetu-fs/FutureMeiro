@@ -13,7 +13,7 @@ public class WorldGen : MonoBehaviour
 
     public GameObject wall;
     public GameObject[] walls;
-    public bool isMakingMaze, searchX, invertMath, cantX, cantY, makeWayX, makeWayY = false;
+    public bool isMakingMaze, searchX, cantX, cantY, makeWayX, makeWayY = false;
     private int rand;
 
     private int wallArrayLength;
@@ -28,12 +28,14 @@ public class WorldGen : MonoBehaviour
     private Vector3 checkPosX, checkPosY;
     private Vector3 cantPos;
 
-    private MeshRenderer wallMesh;
+    private List<MeshRenderer> wallMeshs = new List<MeshRenderer>();
 
     public List<GameObject> searchWays = new List<GameObject>();
+    private List<MeshRenderer> searchWaysmesh = new List<MeshRenderer>();
 
     public List<GameObject> goodWays = new List<GameObject>();
     public List<GameObject> removedWays = new List<GameObject>();
+
 
     public List<Vector3> badWays = new List<Vector3>();
 
@@ -61,15 +63,16 @@ public class WorldGen : MonoBehaviour
         walls = GameObject.FindGameObjectsWithTag("wall");
         wallArrayLength = walls.Length;
 
-
         for (int i = 0; i < wallArrayLength; i++)
         {
-            walls[i].transform.SetParent(transform);
+            //walls[i].transform.SetParent(transform);
             if (walls[i].transform.position.x % 2 == 0 &&
                 walls[i].transform.position.y % 2 == 0)
             {
                 searchWays.Add(walls[i]);
+
             }
+            wallMeshs.Add(walls[i].GetComponent<MeshRenderer>());
             if (walls[i].transform.position == goalPos ||
                 walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 1, goalPos.z) ||
                 walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 2, goalPos.z))
@@ -78,6 +81,10 @@ public class WorldGen : MonoBehaviour
             }
         }
         searchWaysLength = searchWays.Count;
+        for (int i = 0; i < searchWaysLength; i++)
+        {
+            searchWaysmesh.Add(searchWays[i].GetComponent<MeshRenderer>());
+        }
         nowPos = new Vector3(goalPos.x, goalPos.y + 2, goalPos.z);
 
         isMakingMaze = true;
@@ -91,8 +98,13 @@ public class WorldGen : MonoBehaviour
         {
             makingTime = Time.time;
 
-            int randamSwitch = Random.Range(0, 2);
+            rand = Random.Range(0, 2);
 
+            if (rand == 0)
+            {
+                rand -= 1;
+            }
+            int randamSwitch = Random.Range(0, 2);
 
             switch (randamSwitch)
             {
@@ -104,50 +116,52 @@ public class WorldGen : MonoBehaviour
                     searchX = false;
                     break;
             }
-            rand = Random.Range(0, 2);
 
-            if (rand == 0)
-            {
-                rand -= 1;
-            }
             if (!cantX || !cantY)
             {
 
                 if (searchX)
                 {
-                    if (!invertMath)
+                    checkPosX = new Vector3(nowPos.x + rand * 2, nowPos.y, nowPos.z);
+                    nextPos = new Vector3(checkPosX.x - rand, checkPosX.y, checkPosX.z);
+                    int loopCount = 0;
+
+                    for (int j = 0; j < wallArrayLength; j++)
                     {
-                        checkPosX = new Vector3(nowPos.x + rand * 2, nowPos.y, nowPos.z);
-                        nextPos = new Vector3(checkPosX.x - rand, checkPosX.y, checkPosX.z);
-                    }
-                    else
-                    {
-                        checkPosX = new Vector3(nowPos.x - rand * 2, nowPos.y, nowPos.z);
-                        nextPos = new Vector3(checkPosX.x + rand, checkPosX.y, checkPosX.z);
-                    }
-                    for (int j = 0; j < searchWaysLength; j++)
-                    {
-                        if (searchWays[j].transform.position == checkPosX &&
-                            searchWays[j].transform.position.x != -harfXLIM &&
-                            searchWays[j].transform.position.y != -quotaYLIM &&
-                            searchWays[j].transform.position.x != harfXLIM &&
-                            searchWays[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            searchWays[j].GetComponent<MeshRenderer>().enabled == true)
+
+                        if (walls[j].transform.position == checkPosX &&
+                            walls[j].transform.position.x != -harfXLIM &&
+                            walls[j].transform.position.y != -quotaYLIM &&
+                            walls[j].transform.position.x != harfXLIM &&
+                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
+                            wallMeshs[j].enabled == true)
+
                         {
                             makeWayX = true;
-                            searchWays[j].SendMessage("MeshDenable");
-
+                            walls[j].SendMessage("MeshDenable");
+                            loopCount = 0;
                             break;
                         }
-                        makeWayX = false;
+                        loopCount++;
+
+                        if (!makeWayX && loopCount == wallArrayLength - 1)
+                        {
+                            checkPosX = new Vector3(nowPos.x - rand * 2, nowPos.y, nowPos.z);
+                            nextPos = new Vector3(checkPosX.x + rand, checkPosX.y, checkPosX.z);
+                            j = 0;
+                        }
+                        else
+                        {
+                            makeWayX = false;
+                        }
                     }
+
                     if (makeWayX)
                     {
-                        Debug.Log("checkX");
                         for (int i = 0; i < wallArrayLength; i++)
                         {
                             if (walls[i].transform.position == nextPos &&
-                                walls[i].GetComponent<MeshRenderer>().enabled == true)
+                            wallMeshs[i].enabled == true)
                             {
                                 debugObj.transform.position = checkPosX;
                                 walls[i].SendMessage("MeshDenable");
@@ -160,66 +174,59 @@ public class WorldGen : MonoBehaviour
                     else if (!cantX)
                     {
                         cantX = true;
+                        loopCount = 0;
                     }
-                    else
+
+
+                }
+                else
+                {
+
+                    checkPosY = new Vector3(nowPos.x, nowPos.y + rand * 2, nowPos.z);
+                    nextPos = new Vector3(checkPosY.x, checkPosY.y - rand, checkPosY.z);
+                    int loopCount = 0;
+
+                    for (int j = 0; j < wallArrayLength; j++)
                     {
-                        if (!invertMath)
+
+                        if (walls[j].transform.position == checkPosY &&
+                            walls[j].transform.position.x != -harfXLIM &&
+                            walls[j].transform.position.y != -quotaYLIM &&
+                            walls[j].transform.position.x != harfXLIM &&
+                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
+                            wallMeshs[j].enabled == true)
                         {
-                            invertMath = true;
-                            cantX = false;
+                            makeWayY = true;
+                            walls[j].SendMessage("MeshDenable");
+
+                            loopCount = 0;
+                            break;
+                        }
+                        loopCount++;
+
+                        if (!makeWayY && loopCount == wallArrayLength - 1)
+                        {
+                            checkPosY = new Vector3(nowPos.x, nowPos.y - rand * 2, nowPos.z);
+                            nextPos = new Vector3(checkPosY.x, checkPosY.y + rand, checkPosY.z);
+                            j = 0;
                         }
                         else
                         {
-                            invertMath = false;
-                            searchX = false;
-
+                            makeWayY = false;
                         }
-
                     }
-                }
 
-                else
-                {
-                    if (!invertMath)
-                    {
-                        checkPosY = new Vector3(nowPos.x, nowPos.y + rand * 2, nowPos.z);
-                        nextPos = new Vector3(checkPosY.x, checkPosY.y - rand, checkPosY.z);
-                    }
-                    else
-                    {
-                        checkPosY = new Vector3(nowPos.x, nowPos.y - rand * 2, nowPos.z);
-                        nextPos = new Vector3(checkPosY.x, checkPosY.y + rand, checkPosY.z);
-                    }
-                    for (int j = 0; j < searchWaysLength; j++)
-                    {
-                        if (searchWays[j].transform.position == checkPosY &&
-                            searchWays[j].transform.position.x != -harfXLIM &&
-                            searchWays[j].transform.position.y != -quotaYLIM &&
-                            searchWays[j].transform.position.x != harfXLIM &&
-                            searchWays[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            searchWays[j].GetComponent<MeshRenderer>().enabled == true)
-                        {
-                            makeWayY = true;
-                            searchWays[j].SendMessage("MeshDenable");
-
-                            break;
-                        }
-                        makeWayY = false;
-
-                    }
                     if (makeWayY)
                     {
-                        Debug.Log("checkY");
-
                         for (int i = 0; i < wallArrayLength; i++)
                         {
                             if (walls[i].transform.position == nextPos &&
-                                walls[i].GetComponent<MeshRenderer>().enabled == true)
+                            wallMeshs[i].enabled == true)
                             {
                                 debugObj.transform.position = checkPosY;
                                 walls[i].SendMessage("MeshDenable");
                                 nowPos = checkPosY;
-
+         
                                 break;
                             }
                         }
@@ -227,22 +234,9 @@ public class WorldGen : MonoBehaviour
                     else if (!cantY)
                     {
                         cantY = true;
+                        loopCount = 0;
                     }
-                    else
-                    {
-                        if (!invertMath)
-                        {
-                            invertMath = true;
-                            cantY = false;
-                        }
-                        else
-                        {
-                            invertMath = false;
-                            searchX = true;
 
-                        }
-
-                    }
                 }
             }
             else
@@ -252,24 +246,27 @@ public class WorldGen : MonoBehaviour
                 {
                     badWays.Add(cantPos);
                 }
+
                 for (int i = 0; i < searchWaysLength; i++)
                 {
-                    if (searchWays[i].GetComponent<MeshRenderer>().enabled == false)
+                    if (searchWaysmesh[i].enabled == false)
                     {
-                        if (!badWays.Contains(searchWays[i].transform.position) && !removedWays.Contains(searchWays[i]))
-                        {
-                            if (!goodWays.Contains(searchWays[i]))
-                            {
-                                goodWays.Add(searchWays[i]);
-                            }
-                        }
-                        else
+                        if (badWays.Contains(searchWays[i].transform.position) ||
+                            removedWays.Contains(searchWays[i]))
                         {
                             goodWays.Remove(searchWays[i]);
                             if (!removedWays.Contains(searchWays[i]))
                             {
                                 removedWays.Add(searchWays[i]);
                             }
+                        }
+                        else
+                        {
+                            if (!goodWays.Contains(searchWays[i]))
+                            {
+                                goodWays.Add(searchWays[i]);
+                            }
+   
                         }
 
                     }
