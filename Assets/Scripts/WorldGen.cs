@@ -7,14 +7,17 @@ public class WorldGen : MonoBehaviour
     public int XLIMIT = 29;
     public int YLIMIT = 15;
 
-    private int harfXLIM,quotaYLIM;
+    private int harfXLIM, quotaYLIM;
 
     public GameObject debugObj;
 
     public GameObject wall;
     public GameObject[] walls;
-    public bool isMakingMaze, searchX, invertMath, cantX, cantY = false;
+    public bool isMakingMaze, searchX, invertMath, cantX, cantY, makeWayX, makeWayY = false;
     private int rand;
+
+    private int wallArrayLength;
+    private int searchWaysLength;
 
     private float makingTime;
 
@@ -24,6 +27,10 @@ public class WorldGen : MonoBehaviour
     private Vector3 nextPos;
     private Vector3 checkPosX, checkPosY;
     private Vector3 cantPos;
+
+    private MeshRenderer wallMesh;
+
+    public List<GameObject> searchWays = new List<GameObject>();
 
     public List<GameObject> goodWays = new List<GameObject>();
     public List<GameObject> removedWays = new List<GameObject>();
@@ -45,26 +52,32 @@ public class WorldGen : MonoBehaviour
 
             }
         }
-        walls = GameObject.FindGameObjectsWithTag("wall");
-
         int startX = Random.Range(1, XLIMIT - 1);
         int startY = Random.Range(YLIMIT / 2, YLIMIT - 1);
 
         startPos = new Vector3(startX - harfXLIM, startY - quotaYLIM, 0);
         goalPos = new Vector3(0, -quotaYLIM, 0);
 
-        for (int i = 0; i < walls.Length; i++)
-        {
+        walls = GameObject.FindGameObjectsWithTag("wall");
+        wallArrayLength = walls.Length;
 
+
+        for (int i = 0; i < wallArrayLength; i++)
+        {
             walls[i].transform.SetParent(transform);
+            if (walls[i].transform.position.x % 2 == 0 &&
+                walls[i].transform.position.y % 2 == 0)
+            {
+                searchWays.Add(walls[i]);
+            }
             if (walls[i].transform.position == goalPos ||
                 walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 1, goalPos.z) ||
                 walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 2, goalPos.z))
             {
-                walls[i].GetComponent<MeshRenderer>().enabled = false;
+                walls[i].GetComponent<MeshRenderer>().enabled = false; ;
             }
         }
-
+        searchWaysLength = searchWays.Count;
         nowPos = new Vector3(goalPos.x, goalPos.y + 2, goalPos.z);
 
         isMakingMaze = true;
@@ -91,8 +104,6 @@ public class WorldGen : MonoBehaviour
                     searchX = false;
                     break;
             }
-
-            walls = GameObject.FindGameObjectsWithTag("wall");
             rand = Random.Range(0, 2);
 
             if (rand == 0)
@@ -114,41 +125,43 @@ public class WorldGen : MonoBehaviour
                         checkPosX = new Vector3(nowPos.x - rand * 2, nowPos.y, nowPos.z);
                         nextPos = new Vector3(checkPosX.x + rand, checkPosX.y, checkPosX.z);
                     }
-                    for (int j = 0; j < walls.Length; j++)
+                    for (int j = 0; j < searchWaysLength; j++)
                     {
-                     
-                        if (walls[j].transform.position == checkPosX &&
-                            walls[j].transform.position.x != -harfXLIM &&
-                            walls[j].transform.position.y != -quotaYLIM &&
-                            walls[j].transform.position.x != harfXLIM &&
-                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            walls[j].GetComponent<MeshRenderer>().enabled == true)
-
+                        if (searchWays[j].transform.position == checkPosX &&
+                            searchWays[j].transform.position.x != -harfXLIM &&
+                            searchWays[j].transform.position.y != -quotaYLIM &&
+                            searchWays[j].transform.position.x != harfXLIM &&
+                            searchWays[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
+                            searchWays[j].GetComponent<MeshRenderer>().enabled == true)
                         {
-                            for (int i = 0; i < walls.Length; i++)
-                            {
-                                if (walls[i].transform.position == nextPos &&
-                                    walls[i].GetComponent<MeshRenderer>().enabled == true)
-                                {
-                                    debugObj.transform.position = checkPosX;
-                                    walls[i].GetComponent<MeshRenderer>().enabled = false;
-                                    nowPos = checkPosX;
-
-                                    cantX = false;
-                                    break;
-                                }
-                                cantX = true;
-                            }
-                            walls[j].GetComponent<MeshRenderer>().enabled = false;
+                            makeWayX = true;
+                            searchWays[j].SendMessage("MeshDenable");
 
                             break;
                         }
-                        else if (!cantX)
+                        makeWayX = false;
+                    }
+                    if (makeWayX)
+                    {
+                        Debug.Log("checkX");
+                        for (int i = 0; i < wallArrayLength; i++)
                         {
-                            cantX = true;
+                            if (walls[i].transform.position == nextPos &&
+                                walls[i].GetComponent<MeshRenderer>().enabled == true)
+                            {
+                                debugObj.transform.position = checkPosX;
+                                walls[i].SendMessage("MeshDenable");
+                                nowPos = checkPosX;
+
+                                break;
+                            }
                         }
                     }
-                    if (cantX)
+                    else if (!cantX)
+                    {
+                        cantX = true;
+                    }
+                    else
                     {
                         if (!invertMath)
                         {
@@ -164,6 +177,7 @@ public class WorldGen : MonoBehaviour
 
                     }
                 }
+
                 else
                 {
                     if (!invertMath)
@@ -173,46 +187,48 @@ public class WorldGen : MonoBehaviour
                     }
                     else
                     {
-                        Debug.Log("checkY");
-
                         checkPosY = new Vector3(nowPos.x, nowPos.y - rand * 2, nowPos.z);
                         nextPos = new Vector3(checkPosY.x, checkPosY.y + rand, checkPosY.z);
                     }
-                    for (int j = 0; j < walls.Length; j++)
+                    for (int j = 0; j < searchWaysLength; j++)
                     {
-                       
-                        if (walls[j].transform.position == checkPosY &&
-                            walls[j].transform.position.x != -harfXLIM &&
-                            walls[j].transform.position.y != -quotaYLIM &&
-                            walls[j].transform.position.x != harfXLIM &&
-                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            walls[j].GetComponent<MeshRenderer>().enabled == true)
-
+                        if (searchWays[j].transform.position == checkPosY &&
+                            searchWays[j].transform.position.x != -harfXLIM &&
+                            searchWays[j].transform.position.y != -quotaYLIM &&
+                            searchWays[j].transform.position.x != harfXLIM &&
+                            searchWays[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
+                            searchWays[j].GetComponent<MeshRenderer>().enabled == true)
                         {
-                            for (int i = 0; i < walls.Length; i++)
-                            {
-                                if (walls[i].transform.position == nextPos &&
-                                    walls[i].GetComponent<MeshRenderer>().enabled == true)
-                                {
-                                    debugObj.transform.position = checkPosY;
-                                    walls[i].GetComponent<MeshRenderer>().enabled = false;
-                                    nowPos = checkPosY;
-
-                                    cantY = false;
-                                    break;
-                                }
-                                cantY = true;
-                            }
-                            walls[j].GetComponent<MeshRenderer>().enabled = false;
+                            makeWayY = true;
+                            searchWays[j].SendMessage("MeshDenable");
 
                             break;
                         }
-                        else if (!cantY)
-                        {                            
-                            cantY = true;
+                        makeWayY = false;
+
+                    }
+                    if (makeWayY)
+                    {
+                        Debug.Log("checkY");
+
+                        for (int i = 0; i < wallArrayLength; i++)
+                        {
+                            if (walls[i].transform.position == nextPos &&
+                                walls[i].GetComponent<MeshRenderer>().enabled == true)
+                            {
+                                debugObj.transform.position = checkPosY;
+                                walls[i].SendMessage("MeshDenable");
+                                nowPos = checkPosY;
+
+                                break;
+                            }
                         }
                     }
-                    if (cantY)
+                    else if (!cantY)
+                    {
+                        cantY = true;
+                    }
+                    else
                     {
                         if (!invertMath)
                         {
@@ -236,28 +252,23 @@ public class WorldGen : MonoBehaviour
                 {
                     badWays.Add(cantPos);
                 }
-                for (int i = 0; i < walls.Length; i++)
+                for (int i = 0; i < searchWaysLength; i++)
                 {
-                    if (walls[i].GetComponent<MeshRenderer>().enabled == false &&
-                        walls[i].transform.position.x % 2 == 0 &&
-                        walls[i].transform.position.y % 2 == 0)
+                    if (searchWays[i].GetComponent<MeshRenderer>().enabled == false)
                     {
-
-                        if (!badWays.Contains(walls[i].transform.position) && !removedWays.Contains(walls[i]))
+                        if (!badWays.Contains(searchWays[i].transform.position) && !removedWays.Contains(searchWays[i]))
                         {
-                            if (!goodWays.Contains(walls[i]))
+                            if (!goodWays.Contains(searchWays[i]))
                             {
-                                goodWays.Add(walls[i]);
+                                goodWays.Add(searchWays[i]);
                             }
                         }
                         else
                         {
-                            goodWays.Remove(walls[i]);
-                            if (!removedWays.Contains(walls[i]))
+                            goodWays.Remove(searchWays[i]);
+                            if (!removedWays.Contains(searchWays[i]))
                             {
-                                removedWays.Add(walls[i]);
-                                Debug.Log(makingTime);
-
+                                removedWays.Add(searchWays[i]);
                             }
                         }
 
@@ -287,9 +298,6 @@ public class WorldGen : MonoBehaviour
 
 
             }
-        }
-        else
-        {
         }
     }
 }
