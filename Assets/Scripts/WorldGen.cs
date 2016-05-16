@@ -4,296 +4,152 @@ using System.Collections.Generic;
 
 public class WorldGen : MonoBehaviour
 {
+    //最大値の指定
     public int XLIMIT = 29;
     public int YLIMIT = 15;
-
-    private int harfXLIM, quotaYLIM;
-
-    public GameObject debugObj;
-
+    //壁となるオブジェクトを格納
     public GameObject wall;
-    public GameObject[] walls;
-    public bool isMakingMaze, searchX, cantX, cantY, makeWayX, makeWayY = false;
-    private int rand;
-
-    private int wallArrayLength;
-    private int searchWaysLength;
-
-    private float makingTime;
-
-    private Vector3 startPos;
-    private Vector3 goalPos;
-    private Vector3 nowPos;
-    private Vector3 nextPos;
-    private Vector3 checkPosX, checkPosY;
-    private Vector3 cantPos;
-
-    private List<MeshRenderer> wallMeshs = new List<MeshRenderer>();
-
-    public List<GameObject> searchWays = new List<GameObject>();
-    private List<MeshRenderer> searchWaysmesh = new List<MeshRenderer>();
-
-    public List<GameObject> goodWays = new List<GameObject>();
-    public List<GameObject> removedWays = new List<GameObject>();
-
-
-    public List<Vector3> badWays = new List<Vector3>();
+   
+    //マップのサイズを格納
+    bool[,] mapdata;
+    //スタート位置
+    int startX, startY;
+    //ゴール位置
+    int goalX, goalY;
+    //壁を格納する配列
+    GameObject[,] wallsSet;
 
     // Use this for initialization
     void Start()
     {
-        harfXLIM = XLIMIT / 2;
-        quotaYLIM = YLIMIT / 4;
-
-        for (int x = 0; x < XLIMIT; x++)
-        {
-            for (int y = 0; y < YLIMIT; y++)
-            {
-                Instantiate<GameObject>(wall);
-                wall.transform.position = new Vector2(x - harfXLIM, y - quotaYLIM);
-
-            }
-        }
-        int startX = Random.Range(1, XLIMIT - 1);
-        int startY = Random.Range(YLIMIT / 2, YLIMIT - 1);
-
-        startPos = new Vector3(startX - harfXLIM, startY - quotaYLIM, 0);
-        goalPos = new Vector3(0, -quotaYLIM, 0);
-
-        walls = GameObject.FindGameObjectsWithTag("wall");
-        wallArrayLength = walls.Length;
-
-        for (int i = 0; i < wallArrayLength; i++)
-        {
-            //walls[i].transform.SetParent(transform);
-            if (walls[i].transform.position.x % 2 == 0 &&
-                walls[i].transform.position.y % 2 == 0)
-            {
-                searchWays.Add(walls[i]);
-
-            }
-            wallMeshs.Add(walls[i].GetComponent<MeshRenderer>());
-            if (walls[i].transform.position == goalPos ||
-                walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 1, goalPos.z) ||
-                walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 2, goalPos.z))
-            {
-                walls[i].GetComponent<MeshRenderer>().enabled = false; ;
-            }
-        }
-        searchWaysLength = searchWays.Count;
-        for (int i = 0; i < searchWaysLength; i++)
-        {
-            searchWaysmesh.Add(searchWays[i].GetComponent<MeshRenderer>());
-        }
-        nowPos = new Vector3(goalPos.x, goalPos.y + 2, goalPos.z);
-
-        isMakingMaze = true;
-
+        //マップを初期化
+        mapdata = new bool[XLIMIT, YLIMIT];
+        //迷路生成
+        MakeMaze();
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (isMakingMaze)
+        //いったいなにがかいてあったのか、しるものはいない
+    }
+
+    public void MakeMaze()
+    {
+        //リセット用かな？
+        float destroyTime = Time.realtimeSinceStartup;
+        //マップをのすべてをfalse（壁判定）に
+        for (int i = 0; i < mapdata.GetLength(0); i++)
         {
-            makingTime = Time.time;
-
-            rand = Random.Range(0, 2);
-
-            if (rand == 0)
+            for (int j = 0; j < mapdata.GetLength(1); j++)
             {
-                rand -= 1;
+                mapdata[i, j] = false;
             }
-            int randamSwitch = Random.Range(0, 2);
+        }
+        //生成された壁を総当りし、削除
+        foreach (GameObject g in GameObject.FindGameObjectsWithTag("wall"))
+        {
+            Destroy(g);
+        }
+        //破壊が終了した時間
+        destroyTime = Time.realtimeSinceStartup - destroyTime;
+        Debug.Log(destroyTime);
+        //生成を行う
+        float makingTime = Time.realtimeSinceStartup;
 
-            switch (randamSwitch)
+        //開始位置をランダムで設定
+        /*
+        29x15のとき
+        intなので　29/2 = 14
+        14*2-1で　1～27
+        同じ計算で　1～5
+        */
+        startX = Random.Range(1, XLIMIT / 2) * 2 - 1;
+        startY = Random.Range(1, YLIMIT / 4) * 2 - 1;
+        //穴を掘る
+        DigMaze(startX, startY);
+        //穴が掘り終わり生成完了
+        makingTime = Time.realtimeSinceStartup - makingTime;
+        Debug.Log(makingTime);
+
+        //壁を立てる
+        float settingTime = Time.realtimeSinceStartup;
+        SetWall();
+        settingTime = Time.realtimeSinceStartup - settingTime;
+        Debug.Log(settingTime);
+    }
+    //穴を掘る関数
+    void DigMaze(int x, int y)
+    {
+        //渡された引数から配列の中身をtrue
+        mapdata[x, y] = true;
+        //上下左右の方向初期化
+        int[] dires = new int[4] { 0, 1, 2, 3 };
+        //方向指定後の座標宣言
+        int dx = 0;
+        int dy = 0;
+        for (int i = 0; i < 4; i++)//方向シャッフル（3回試行
+        {
+            //ランダムで方向を設定（格納されている順番を入れ替え？
+            int rand = Random.Range(0, 4);
+            dires[i] += dires[rand];
+            dires[rand] = dires[i] - dires[rand];
+            dires[i] -= dires[rand];
+        }
+        //シャッフルされた方向を読む
+        for (int i = 0; i < 4; i++)
+        {
+            //4方向を順番に試行
+            switch (dires[i])
             {
                 case 0:
-                    searchX = true;
+                    dx = 0;
+                    dy = -1;
                     break;
-
                 case 1:
-                    searchX = false;
+                    dx = 1;
+                    dy = 0;
+                    break;
+                case 2:
+                    dx = 0;
+                    dy = 1;
+                    break;
+                case 3:
+                    dx = -1;
+                    dy = 0;
                     break;
             }
-
-            if (!cantX || !cantY)
+            //引数とランダム方向を倍にしたものを足し2つ先の要素をみる
+            int xx = x + dx * 2;
+            int yy = y + dy * 2;
+            //壁や壁の外を参照しておらず、false(壁)であれば
+            if (0 < xx && xx < XLIMIT && 0 < yy && yy < YLIMIT && !mapdata[xx, yy])
             {
-
-                if (searchX)
-                {
-                    checkPosX = new Vector3(nowPos.x + rand * 2, nowPos.y, nowPos.z);
-                    nextPos = new Vector3(checkPosX.x - rand, checkPosX.y, checkPosX.z);
-                    int loopCount = 0;
-
-                    for (int j = 0; j < wallArrayLength; j++)
-                    {
-
-                        if (walls[j].transform.position == checkPosX &&
-                            walls[j].transform.position.x != -harfXLIM &&
-                            walls[j].transform.position.y != -quotaYLIM &&
-                            walls[j].transform.position.x != harfXLIM &&
-                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            wallMeshs[j].enabled == true)
-
-                        {
-                            makeWayX = true;
-                            walls[j].SendMessage("MeshDenable");
-                            loopCount = 0;
-                            break;
-                        }
-                        loopCount++;
-
-                        if (!makeWayX && loopCount == wallArrayLength - 1)
-                        {
-                            checkPosX = new Vector3(nowPos.x - rand * 2, nowPos.y, nowPos.z);
-                            nextPos = new Vector3(checkPosX.x + rand, checkPosX.y, checkPosX.z);
-                            j = 0;
-                        }
-                        else
-                        {
-                            makeWayX = false;
-                        }
-                    }
-
-                    if (makeWayX)
-                    {
-                        for (int i = 0; i < wallArrayLength; i++)
-                        {
-                            if (walls[i].transform.position == nextPos &&
-                            wallMeshs[i].enabled == true)
-                            {
-                                debugObj.transform.position = checkPosX;
-                                walls[i].SendMessage("MeshDenable");
-                                nowPos = checkPosX;
-
-                                break;
-                            }
-                        }
-                    }
-                    else if (!cantX)
-                    {
-                        cantX = true;
-                        loopCount = 0;
-                    }
-
-
-                }
-                else
-                {
-
-                    checkPosY = new Vector3(nowPos.x, nowPos.y + rand * 2, nowPos.z);
-                    nextPos = new Vector3(checkPosY.x, checkPosY.y - rand, checkPosY.z);
-                    int loopCount = 0;
-
-                    for (int j = 0; j < wallArrayLength; j++)
-                    {
-
-                        if (walls[j].transform.position == checkPosY &&
-                            walls[j].transform.position.x != -harfXLIM &&
-                            walls[j].transform.position.y != -quotaYLIM &&
-                            walls[j].transform.position.x != harfXLIM &&
-                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            wallMeshs[j].enabled == true)
-                        {
-                            makeWayY = true;
-                            walls[j].SendMessage("MeshDenable");
-
-                            loopCount = 0;
-                            break;
-                        }
-                        loopCount++;
-
-                        if (!makeWayY && loopCount == wallArrayLength - 1)
-                        {
-                            checkPosY = new Vector3(nowPos.x, nowPos.y - rand * 2, nowPos.z);
-                            nextPos = new Vector3(checkPosY.x, checkPosY.y + rand, checkPosY.z);
-                            j = 0;
-                        }
-                        else
-                        {
-                            makeWayY = false;
-                        }
-                    }
-
-                    if (makeWayY)
-                    {
-                        for (int i = 0; i < wallArrayLength; i++)
-                        {
-                            if (walls[i].transform.position == nextPos &&
-                            wallMeshs[i].enabled == true)
-                            {
-                                debugObj.transform.position = checkPosY;
-                                walls[i].SendMessage("MeshDenable");
-                                nowPos = checkPosY;
-         
-                                break;
-                            }
-                        }
-                    }
-                    else if (!cantY)
-                    {
-                        cantY = true;
-                        loopCount = 0;
-                    }
-
-                }
+                //渡された座標とランダム方向を加算した座標をtrueにして、自身を呼び出し
+                mapdata[x + dx, y + dy] = true;
+                DigMaze(xx, yy);
             }
-            else
+        }
+    }
+    //実際に壁をセット
+    void SetWall()
+    {
+        //
+        int xHalf = XLIMIT / 2;
+        int yQuarter = YLIMIT / 4;
+        //マップ総当り
+        for (int i = 0; i < mapdata.GetLength(0); i++)//ヨコ
+        {
+            for (int j = 0; j < mapdata.GetLength(1); j++)//タテ
             {
-                cantPos = nowPos;
-                if (!badWays.Contains(cantPos))
+                //該当座標がfalseで、さらに真ん中の最下部、またはそのひとつ上でなければ
+                if (!mapdata[i, j] && !(i == xHalf && (j == 0 || j == 1)))
                 {
-                    badWays.Add(cantPos);
+                    //壁をインスタンス化
+                    GameObject wall = Instantiate<GameObject>(this.wall);
+                    //位置を真ん中に来るように調整
+                    wall.transform.position = new Vector2(i - xHalf, j - yQuarter);
                 }
-
-                for (int i = 0; i < searchWaysLength; i++)
-                {
-                    if (searchWaysmesh[i].enabled == false)
-                    {
-                        if (badWays.Contains(searchWays[i].transform.position) ||
-                            removedWays.Contains(searchWays[i]))
-                        {
-                            goodWays.Remove(searchWays[i]);
-                            if (!removedWays.Contains(searchWays[i]))
-                            {
-                                removedWays.Add(searchWays[i]);
-                            }
-                        }
-                        else
-                        {
-                            if (!goodWays.Contains(searchWays[i]))
-                            {
-                                goodWays.Add(searchWays[i]);
-                            }
-   
-                        }
-
-                    }
-                }
-                int randChoice = Random.Range(0, goodWays.Count);
-
-                if (goodWays.Count > 0)
-                {
-                    debugObj.transform.position = goodWays[randChoice].transform.position;
-
-                    nowPos = goodWays[randChoice].transform.position;
-                    //goodWays.Clear();
-                    cantX = false;
-                    cantY = false;
-                }
-                else
-                {
-
-                    cantX = false;
-                    cantY = false;
-                    Debug.Log(makingTime);
-
-                    isMakingMaze = false;
-
-                }
-
-
             }
         }
     }
