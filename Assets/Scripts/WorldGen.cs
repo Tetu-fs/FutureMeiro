@@ -5,152 +5,162 @@ using System.Collections.Generic;
 public class WorldGen : MonoBehaviour
 {
     //最大値の指定
-    public int XLIMIT = 29;
-    public int YLIMIT = 15;
+    public int XLIMIT = 51;
+    public int YLIMIT = 25;
     //壁となるオブジェクトを格納
     public GameObject wall;
-   
-    //マップのサイズを格納
-    bool[,] mapdata;
+    public GameObject hero;
+    public AudioClip loadSE;
+    public AudioClip endSE;
+
+
+    private AudioSource se;
+    private bool setting = false;
+
+    //マップのデータを格納
+    //0=壁 1=道  2=扉　3=ギミック予定
+    int[,] mapdata;
+
     //スタート位置
     int startX, startY;
     //ゴール位置
     int goalX, goalY;
+
     //壁を格納する配列
-    GameObject[,] wallsSet;
+    GameObject[] walls;
+
+    int callNum = 0;
+    float timer = 0;
 
     // Use this for initialization
     void Start()
     {
+        //clip = GetComponent<AudioClip>();
+        se = GetComponent<AudioSource>();
         //マップを初期化
-        mapdata = new bool[XLIMIT, YLIMIT];
+        mapdata = new int[XLIMIT, YLIMIT];
         //迷路生成
         MakeMaze();
+        walls = GameObject.FindGameObjectsWithTag("wall");
+        setting = true;
     }
 
     // Update is called once per frame
     void Update()
     {
-        //いったいなにがかいてあったのか、しるものはいない
+        if (setting)
+        {
+            callWallMesh();
+        }
+    }
+    void callWallMesh()
+    {
+        if (callNum < walls.Length)
+        {
+            walls[callNum].SendMessage("MeshEnable");
+            se.PlayOneShot(loadSE);
+
+            callNum++;
+        }
+        else
+        {
+            se.PlayOneShot(endSE);
+
+            setting = false;
+        }
+
     }
 
-    public void MakeMaze()
+    void MakeMaze()
     {
-        //リセット用かな？
-        float destroyTime = Time.realtimeSinceStartup;
-        //マップをのすべてをfalse（壁判定）に
-        for (int i = 0; i < mapdata.GetLength(0); i++)
+        //  全てを壁(0)に初期化
+        for (int i = 0; i < mapdata.GetLength(0); i++) 
         {
             for (int j = 0; j < mapdata.GetLength(1); j++)
             {
-                mapdata[i, j] = false;
+                mapdata[i, j] = 0;
             }
         }
-        //生成された壁を総当りし、削除
-        foreach (GameObject g in GameObject.FindGameObjectsWithTag("wall"))
-        {
-            Destroy(g);
-        }
-        //破壊が終了した時間
-        destroyTime = Time.realtimeSinceStartup - destroyTime;
-        Debug.Log(destroyTime);
-        //生成を行う
-        float makingTime = Time.realtimeSinceStartup;
-
-        //開始位置をランダムで設定
-        /*
-        29x15のとき
-        intなので　29/2 = 14
-        14*2-1で　1～27
-        同じ計算で　1～5
-        */
         startX = Random.Range(1, XLIMIT / 2) * 2 - 1;
         startY = Random.Range(1, YLIMIT / 4) * 2 - 1;
-        //穴を掘る
-        DigMaze(startX, startY);
-        //穴が掘り終わり生成完了
-        makingTime = Time.realtimeSinceStartup - makingTime;
-        Debug.Log(makingTime);
-
-        //壁を立てる
-        float settingTime = Time.realtimeSinceStartup;
+        Dig(startX, startY);
         SetWall();
-        settingTime = Time.realtimeSinceStartup - settingTime;
-        Debug.Log(settingTime);
     }
-    //穴を掘る関数
-    void DigMaze(int x, int y)
+
+    void Dig(int x,int y)
     {
-        //渡された引数から配列の中身をtrue
-        mapdata[x, y] = true;
-        //上下左右の方向初期化
-        int[] dires = new int[4] { 0, 1, 2, 3 };
-        //方向指定後の座標宣言
-        int dx = 0;
-        int dy = 0;
-        for (int i = 0; i < 4; i++)//方向シャッフル（3回試行
+        //渡された値をで道(1)へ
+        mapdata[x, y] = 1;
+        int[] dire = new int[4] { 0, 1, 2, 3 };
+        //なんか有名な配列のシャッフルアルゴリズムを実行
+        for(int i = 0; i < dire.Length; i++)
         {
-            //ランダムで方向を設定（格納されている順番を入れ替え？
             int rand = Random.Range(0, 4);
-            dires[i] += dires[rand];
-            dires[rand] = dires[i] - dires[rand];
-            dires[i] -= dires[rand];
+            dire[i] += dire[rand];
+            dire[rand] = dire[i] - dire[rand];
+            dire[i] -= dire[rand];
         }
-        //シャッフルされた方向を読む
-        for (int i = 0; i < 4; i++)
+        //探索方向の指定とXYそれぞれをintにキャスト
+        Vector2 direction = Vector2.zero;
+
+        //探索を開始
+        for (int i = 0; i < dire.Length; i++)
         {
-            //4方向を順番に試行
-            switch (dires[i])
+            switch (dire[i])
             {
                 case 0:
-                    dx = 0;
-                    dy = -1;
+                    direction = new Vector2(0, 1);
                     break;
                 case 1:
-                    dx = 1;
-                    dy = 0;
+                    direction = new Vector2(1, 0);
                     break;
                 case 2:
-                    dx = 0;
-                    dy = 1;
+                    direction = new Vector2(0, -1);
                     break;
                 case 3:
-                    dx = -1;
-                    dy = 0;
+                    direction = new Vector2(-1, 0);
                     break;
             }
-            //引数とランダム方向を倍にしたものを足し2つ先の要素をみる
+            int dx = (int)direction.x;
+            int dy = (int)direction.y;
+
             int xx = x + dx * 2;
             int yy = y + dy * 2;
-            //壁や壁の外を参照しておらず、false(壁)であれば
-            if (0 < xx && xx < XLIMIT && 0 < yy && yy < YLIMIT && !mapdata[xx, yy])
+            //画面端ではなくかつ壁(0)であれば
+            if (0 < xx && xx < XLIMIT && 0 < yy && yy < YLIMIT && mapdata[xx, yy] == 0)
             {
-                //渡された座標とランダム方向を加算した座標をtrueにして、自身を呼び出し
-                mapdata[x + dx, y + dy] = true;
-                DigMaze(xx, yy);
+                mapdata[x + dx, y + dy] = 1;
+                Dig(xx, yy);
             }
         }
     }
-    //実際に壁をセット
+
+
+    //壁をセット
     void SetWall()
     {
-        //
-        int xHalf = XLIMIT / 2;
-        int yQuarter = YLIMIT / 4;
+        //位置調整用変数
+        int xCoordinate = XLIMIT / 2;
+        int yCoordinate = YLIMIT / 4;
+        float time = 0;
         //マップ総当り
-        for (int i = 0; i < mapdata.GetLength(0); i++)//ヨコ
+
+        for (int y = 0; y < mapdata.GetLength(1); y++)
         {
-            for (int j = 0; j < mapdata.GetLength(1); j++)//タテ
+            for (int x = 0; x < mapdata.GetLength(0); x++)
             {
                 //該当座標がfalseで、さらに真ん中の最下部、またはそのひとつ上でなければ
-                if (!mapdata[i, j] && !(i == xHalf && (j == 0 || j == 1)))
+                if (mapdata[x, y] == 0 && !(x == xCoordinate && (y == 0 || y == 1)))
                 {
+
                     //壁をインスタンス化
                     GameObject wall = Instantiate<GameObject>(this.wall);
+                    wall.transform.SetParent(transform);
                     //位置を真ん中に来るように調整
-                    wall.transform.position = new Vector2(i - xHalf, j - yQuarter);
+                    wall.transform.position = new Vector2(x - xCoordinate, y - yCoordinate);
                 }
             }
         }
     }
+
 }

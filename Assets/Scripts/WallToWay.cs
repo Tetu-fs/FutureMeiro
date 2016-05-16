@@ -3,16 +3,18 @@ using System.Collections;
 
 public class WallToWay : MonoBehaviour {
 
+
     private MeshRenderer myMesh;
     // Use this for initialization
     void Start () {
         myMesh = GetComponent<MeshRenderer>();
+        myMesh.enabled = false;
 
     }
 
-    void MeshDenable()
+    void MeshEnable()
     {
-        myMesh.enabled = false;
+        myMesh.enabled = true;
     }
 
 }
