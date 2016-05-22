@@ -4,22 +4,30 @@ using System.Collections.Generic;
 
 public class WorldGen : MonoBehaviour
 {
+
     //最大値の指定
-    public int XLIMIT = 51;
-    public int YLIMIT = 25;
+    private int XLIMIT;
+    private int YLIMIT;
+
+    private LoadJSON loadJson;
+
     //壁となるオブジェクトを格納
     public GameObject wall;
     public GameObject hero;
     public AudioClip loadSE;
     public AudioClip endSE;
 
+    public bool setDone = false;
 
+    private GameObject heroInst;
     private AudioSource se;
-    private bool setting = false;
+    private HeroMove heroMove;
 
+    private bool setting = false;
+    private bool setHero = false;
     //マップのデータを格納
-    //0=壁 1=道  2=扉　3=ギミック予定
-    int[,] mapdata;
+    //0=壁 1=道  2=主人公　3=ギミック予定
+    public int[,] mapdata;
 
     //スタート位置
     int startX, startY;
@@ -32,18 +40,27 @@ public class WorldGen : MonoBehaviour
     int callNum = 0;
     float timer = 0;
 
+
     // Use this for initialization
     void Start()
     {
-        //clip = GetComponent<AudioClip>();
+        loadJson = new LoadJSON();
+        string read = loadJson.Reading("mapsize");
+        MapSize mapSize = JsonUtility.FromJson<MapSize>(read);
+
+        XLIMIT = mapSize.x;
+        YLIMIT = mapSize.y;
         se = GetComponent<AudioSource>();
         //マップを初期化
         mapdata = new int[XLIMIT, YLIMIT];
         //迷路生成
         MakeMaze();
         walls = GameObject.FindGameObjectsWithTag("wall");
+        heroMove = GameObject.FindWithTag("Hero").GetComponent<HeroMove>();
         setting = true;
+
     }
+
 
     // Update is called once per frame
     void Update()
@@ -52,7 +69,14 @@ public class WorldGen : MonoBehaviour
         {
             callWallMesh();
         }
+        else if(!setDone)
+        {
+            setDone = true;
+        }
     }
+
+
+
     void callWallMesh()
     {
         if (callNum < walls.Length)
@@ -129,7 +153,16 @@ public class WorldGen : MonoBehaviour
             //画面端ではなくかつ壁(0)であれば
             if (0 < xx && xx < XLIMIT && 0 < yy && yy < YLIMIT && mapdata[xx, yy] == 0)
             {
-                mapdata[x + dx, y + dy] = 1;
+                int rand = Random.Range(0, 10);
+                if (!setHero && yy > (YLIMIT/4)*3 && rand == 0)
+                {
+                    mapdata[x + dx, y + dy] = 2;
+                    setHero = true;
+                }
+                else
+                {
+                    mapdata[x + dx, y + dy] = 1;
+                }
                 Dig(xx, yy);
             }
         }
@@ -140,8 +173,7 @@ public class WorldGen : MonoBehaviour
     void SetWall()
     {
         //位置調整用変数
-        int xCoordinate = XLIMIT / 2;
-        int yCoordinate = YLIMIT / 4;
+        int xHarf = XLIMIT / 2;
         float time = 0;
         //マップ総当り
 
@@ -150,14 +182,22 @@ public class WorldGen : MonoBehaviour
             for (int x = 0; x < mapdata.GetLength(0); x++)
             {
                 //該当座標がfalseで、さらに真ん中の最下部、またはそのひとつ上でなければ
-                if (mapdata[x, y] == 0 && !(x == xCoordinate && (y == 0 || y == 1)))
+                if (!(x == xHarf && (y == 0 || y == 1)))
                 {
+                    if(mapdata[x, y] == 0)
+                    {                    //壁をインスタンス化
+                        GameObject wall = Instantiate<GameObject>(this.wall);
+                        wall.transform.SetParent(transform);
+                        //位置を真ん中に来るように調整
+                        wall.transform.position = new Vector2(x, y);
 
-                    //壁をインスタンス化
-                    GameObject wall = Instantiate<GameObject>(this.wall);
-                    wall.transform.SetParent(transform);
-                    //位置を真ん中に来るように調整
-                    wall.transform.position = new Vector2(x - xCoordinate, y - yCoordinate);
+                    }
+                    else if (mapdata[x, y] == 2)
+                    {
+                        heroInst = Instantiate<GameObject>(this.hero);
+                        //位置を真ん中に来るように調整
+                        heroInst.transform.position = new Vector2(x, y);
+                    }
                 }
             }
         }
