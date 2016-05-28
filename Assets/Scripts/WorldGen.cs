@@ -13,6 +13,7 @@ public class WorldGen : MonoBehaviour
 
     //壁となるオブジェクトを格納
     public GameObject wall;
+    public GameObject goal;
     public GameObject hero;
     public AudioClip loadSE;
     public AudioClip endSE;
@@ -38,7 +39,6 @@ public class WorldGen : MonoBehaviour
     GameObject[] walls;
 
     int callNum = 0;
-    float timer = 0;
 
 
     // Use this for initialization
@@ -150,21 +150,26 @@ public class WorldGen : MonoBehaviour
 
             int xx = x + dx * 2;
             int yy = y + dy * 2;
+
+
             //画面端ではなくかつ壁(0)であれば
             if (0 < xx && xx < XLIMIT && 0 < yy && yy < YLIMIT && mapdata[xx, yy] == 0)
             {
                 int rand = Random.Range(0, 10);
-                if (!setHero && yy > (YLIMIT/4)*3 && rand == 0)
+                if (!setHero && yy > (YLIMIT / 4) * 3 && rand == 0)
                 {
                     mapdata[x + dx, y + dy] = 2;
                     setHero = true;
                 }
+
                 else
                 {
                     mapdata[x + dx, y + dy] = 1;
                 }
                 Dig(xx, yy);
             }
+            //ゴール設定
+
         }
     }
 
@@ -174,22 +179,31 @@ public class WorldGen : MonoBehaviour
     {
         //位置調整用変数
         int xHarf = XLIMIT / 2;
-        float time = 0;
         //マップ総当り
 
         for (int y = 0; y < mapdata.GetLength(1); y++)
         {
             for (int x = 0; x < mapdata.GetLength(0); x++)
             {
+                if (x == XLIMIT / 2 && y == 0)
+                {
+                    mapdata[x, y] = 4;
+                }
+                if (mapdata[x, y] == 4)
+                {
+                    GameObject Goal = Instantiate<GameObject>(this.goal);
+                    Goal.transform.SetParent(transform);
+                    Goal.transform.position = new Vector2(x, y);
+                }
                 //該当座標がfalseで、さらに真ん中の最下部、またはそのひとつ上でなければ
                 if (!(x == xHarf && (y == 0 || y == 1)))
                 {
                     if(mapdata[x, y] == 0)
                     {                    //壁をインスタンス化
-                        GameObject wall = Instantiate<GameObject>(this.wall);
-                        wall.transform.SetParent(transform);
+                        GameObject Wall = Instantiate<GameObject>(this.wall);
+                        Wall.transform.SetParent(transform);
                         //位置を真ん中に来るように調整
-                        wall.transform.position = new Vector2(x, y);
+                        Wall.transform.position = new Vector2(x, y);
 
                     }
                     else if (mapdata[x, y] == 2)
@@ -199,6 +213,7 @@ public class WorldGen : MonoBehaviour
                         heroInst.transform.position = new Vector2(x, y);
                     }
                 }
+
             }
         }
     }
