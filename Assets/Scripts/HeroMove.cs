@@ -13,78 +13,149 @@ public class HeroMove : MonoBehaviour
 
 
     private WorldGen WG;
-    private GameObject worldGen;
-    public Vector2 heroPos, nextPos, direction, pastDirection = Vector2.zero;
+    private Choices choices;
+    private GameObject worldGen, canvas, talk;
+    public Vector2 beforePos,heroPos, nextPos, dire, playerDire, pastDire = Vector2.zero;
 
-    public bool angry, moving, otherWay, done, goal = false;
+    public bool angry, moving, canMove, choiced, otherWay, done, goal = false;
     private float call = 0;
-    private int stopCount = 0;
-    private int[] dire;
+    private int stopCount, angryPoint, life = 0;
+    private int[] _dire;
     // Use this for initialization
     void Start()
     {
         heroPos = transform.position;
     }
-
-    void randomDire()
+    void CanMove()
+    {
+        canMove = true;
+        otherWay = false;
+        choiced = true;
+    }
+    void normalMoving(Vector2 mypos, Vector2 dire)
     {
 
+        int x = (int)mypos.x;
+        int y = (int)mypos.y;
+        int dx = (int)dire.x;
+        int dy = (int)dire.y;
+        nextPos = new Vector2(x + dx, y + dy);
+        if (WG.mapdata[x, y - 1] == 4)
+        {
+            otherWay = false;
+            transform.position = new Vector2(x, y - 1);
+            goal = true;
+            Debug.Log("goal");
+        }
+        else if (WG.mapdata[x + dx, y + dy] != 0)
+        {
+            canMove = true;
+
+            if (!otherWay && !choiced)
+            {
+                if (dire == pastDire)
+                {
+                    talk.SendMessage("BackWay");
+                }
+                if (dx != 0)
+                {
+                    if (WG.mapdata[x, y + 1] == 1 || WG.mapdata[x, y - 1] == 1)
+                    {
+                        canMove = false;
+                        otherWay = true;
+                    }
+                }
+                else
+                {
+                    if (WG.mapdata[x + 1, y] == 1 || WG.mapdata[x - 1, y] == 1)
+                    {
+                        canMove = false;
+                        otherWay = true;
+                    }
+                }
+
+            }
+
+            if (canMove && !otherWay)
+            {
+                transform.position = nextPos;
+                pastDire = new Vector2(-dx, -dy);
+                choiced = false;
+            }
+
+        }
+        else
+        {
+            canMove = false;
+            if (dire == pastDire)
+            {
+                talk.SendMessage("GoWall");
+
+            }
+        }
+        if ((Vector2)transform.position == beforePos)
+        {
+            choices.SendMessage("enableRoot");
+        }
+
+        beforePos = transform.position;
 
     }
+
+
     void AngryMoving(Vector2 mypos)
     {
         //探索方向の指定とXYそれぞれをintにキャスト
         if (!moving && WG.mapdata != null)
         {
-            dire = new int[4] { 0, 1, 2, 3 };
+            _dire = new int[4] { 0, 1, 2, 3 };
             //なんか有名な配列のシャッフルアルゴリズムを実行
-            for (int i = 0; i < dire.Length; i++)
+            for (int i = 0; i < _dire.Length; i++)
             {
                 int rand = Random.Range(0, 4);
-                dire[i] += dire[rand];
-                dire[rand] = dire[i] - dire[rand];
-                dire[i] -= dire[rand];
+                _dire[i] += _dire[rand];
+                _dire[rand] = _dire[i] - _dire[rand];
+                _dire[i] -= _dire[rand];
             }
         }
         //探索を開始
-        for (int i = 0; i < dire.Length; i++)
+        for (int i = 0; i < _dire.Length; i++)
         {
             if (!moving)
             {
-                switch (dire[i])
+                switch (_dire[i])
                 {
                     case 0:
-                        direction = new Vector2(0, 1);
+                        dire = new Vector2(0, 1);
                         break;
                     case 1:
-                        direction = new Vector2(1, 0);
+                        dire = new Vector2(1, 0);
                         break;
                     case 2:
-                        direction = new Vector2(0, -1);
+                        dire = new Vector2(0, -1);
                         break;
                     case 3:
-                        direction = new Vector2(-1, 0);
+                        dire = new Vector2(-1, 0);
                         break;
                 }
             }
             int x = (int)mypos.x;
             int y = (int)mypos.y;
-            int dx = (int)direction.x;
-            int dy = (int)direction.y;
+            int dx = (int)dire.x;
+            int dy = (int)dire.y;
 
             nextPos = new Vector2(x + dx, y + dy);
-            if(WG.mapdata[x + dx, y + dy] == 4)
+            if(WG.mapdata[x, y - 1] == 4)
             {
                 otherWay = false;
-                transform.position = nextPos;
-                pastDirection = new Vector2(dx, dy);
+                transform.position = new Vector2(x, y - 1);
                 goal = true;
                 Debug.Log("goal");
                 break;
             }
             if (WG.mapdata[x + dx, y + dy] != 0)
             {
-                if (direction != -pastDirection)
+                if (dire != -pastDire)
                 {
                     moving = true;
                     if (!otherWay)
@@ -110,7 +181,7 @@ public class HeroMove : MonoBehaviour
                     {
                         otherWay = false;
                         transform.position = nextPos;
-                        pastDirection = new Vector2(dx, dy);
+                        pastDire = new Vector2(dx, dy);
                         break;
                     }
                 }
@@ -121,14 +192,14 @@ public class HeroMove : MonoBehaviour
                 {
                     if (WG.mapdata[x, y + 1] == 0 && WG.mapdata[x, y - 1] == 0)
                     {
-                        pastDirection = -pastDirection;
+                        pastDire = -pastDire;
                     }
                 }
                 else
                 {
                     if (WG.mapdata[x + 1, y] == 0 && WG.mapdata[x - 1, y] == 0)
                     {
-                        pastDirection = -pastDirection;
+                        pastDire = -pastDire;
                     }
                 }
                 moving = false;
@@ -136,8 +207,27 @@ public class HeroMove : MonoBehaviour
             }
         }
     }
-        
-    
+
+
+    void DireNavi(int d)
+    {
+        switch (d)
+        {
+            case 0:
+                playerDire = new Vector2(0, 1);
+                break;
+            case 1:
+                playerDire = new Vector2(1, 0);
+                break;
+            case 2:
+                playerDire = new Vector2(-1, 0);
+                break;
+            case 3:
+                playerDire = new Vector2(0, -1);
+                break;
+        }
+
+    }
 
     // Update is called once per frame
     void Update()
@@ -147,19 +237,37 @@ public class HeroMove : MonoBehaviour
         {
             worldGen = GameObject.FindWithTag("WorldGen");
             WG = worldGen.GetComponent<WorldGen>();
-
+        }
+        if(canvas == null)
+        {
+            canvas = GameObject.FindWithTag("GUI");
+            choices = canvas.GetComponent<Choices>();
+            talk = GameObject.FindWithTag("Talk");
         }
         if (WG.setDone && !goal)
         {
             heroPos = transform.position;
-            AngryMoving(heroPos);
 
             call += Time.deltaTime;
             if (call > 0.1)
             {
+                if (angry)
+                {
+                    AngryMoving(heroPos);
+                }
+                else if(!talk.GetComponent<TalkHero>().tutorialGet)
+                {
+                    normalMoving(heroPos, playerDire);
+                }
                 call = 0;
             }
         }
-
+        if (goal)
+        {
+            if (!angry)
+            {
+                talk.GetComponent<TalkHero>().clearBool = true;
+            }
+        }
     }
 }

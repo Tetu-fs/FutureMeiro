@@ -16,4 +16,15 @@ public class LoadJSON
 
         return json;
     }
+    public string ReadingUni(string fileName)
+    {
+        string url;
+        url = Application.dataPath + "/Json/" + fileName + ".json";
+        FileInfo loadFile = new FileInfo(url);
+
+        StreamReader sr = new StreamReader(loadFile.OpenRead(), Encoding.Unicode);
+        string json = sr.ReadToEnd();
+
+        return json;
+    }
 }
