@@ -4,292 +4,218 @@ using System.Collections.Generic;
 
 public class WorldGen : MonoBehaviour
 {
-    public int XLIMIT = 29;
-    public int YLIMIT = 15;
 
-    private int harfXLIM,quotaYLIM;
+    //最大値の指定
+    private int XLIMIT;
+    private int YLIMIT;
 
-    public GameObject debugObj;
+    private LoadJSON loadJson;
 
+    //壁となるオブジェクトを格納
     public GameObject wall;
-    public GameObject[] walls;
-    public bool isMakingMaze, searchX, invertMath, cantX, cantY = false;
-    private int rand;
+    public GameObject goal;
+    public GameObject hero;
+    public AudioClip loadSE;
+    public AudioClip endSE;
 
-    private float makingTime;
+    public bool setDone = false;
 
-    private Vector3 startPos;
-    private Vector3 goalPos;
-    private Vector3 nowPos;
-    private Vector3 nextPos;
-    private Vector3 checkPosX, checkPosY;
-    private Vector3 cantPos;
+    private GameObject heroInst;
+    private AudioSource se;
+    private HeroMove heroMove;
 
-    public List<GameObject> goodWays = new List<GameObject>();
-    public List<GameObject> removedWays = new List<GameObject>();
+    private bool setting = false;
+    private bool setHero = false;
+    //マップのデータを格納
+    //0=壁 1=道  2=主人公　3=ギミック予定
+    public int[,] mapdata;
 
-    public List<Vector3> badWays = new List<Vector3>();
+    //スタート位置
+    int startX, startY;
+    //ゴール位置
+    int goalX, goalY;
+
+    //壁を格納する配列
+    GameObject[] walls;
+
+    int callNum = 0;
+
 
     // Use this for initialization
     void Start()
     {
-        harfXLIM = XLIMIT / 2;
-        quotaYLIM = YLIMIT / 4;
+        loadJson = new LoadJSON();
+        string read = loadJson.Reading("mapsize");
+        MapSize mapSize = JsonUtility.FromJson<MapSize>(read);
 
-        for (int x = 0; x < XLIMIT; x++)
-        {
-            for (int y = 0; y < YLIMIT; y++)
-            {
-                Instantiate<GameObject>(wall);
-                wall.transform.position = new Vector2(x - harfXLIM, y - quotaYLIM);
-
-            }
-        }
+        XLIMIT = mapSize.x;
+        YLIMIT = mapSize.y;
+        se = GetComponent<AudioSource>();
+        //マップを初期化
+        mapdata = new int[XLIMIT, YLIMIT];
+        //迷路生成
+        MakeMaze();
         walls = GameObject.FindGameObjectsWithTag("wall");
-
-        int startX = Random.Range(1, XLIMIT - 1);
-        int startY = Random.Range(YLIMIT / 2, YLIMIT - 1);
-
-        startPos = new Vector3(startX - harfXLIM, startY - quotaYLIM, 0);
-        goalPos = new Vector3(0, -quotaYLIM, 0);
-
-        for (int i = 0; i < walls.Length; i++)
-        {
-
-            walls[i].transform.SetParent(transform);
-            if (walls[i].transform.position == goalPos ||
-                walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 1, goalPos.z) ||
-                walls[i].transform.position == new Vector3(goalPos.x, goalPos.y + 2, goalPos.z))
-            {
-                walls[i].GetComponent<MeshRenderer>().enabled = false;
-            }
-        }
-
-        nowPos = new Vector3(goalPos.x, goalPos.y + 2, goalPos.z);
-
-        isMakingMaze = true;
+        heroMove = GameObject.FindWithTag("Hero").GetComponent<HeroMove>();
+        setting = true;
 
     }
+
 
     // Update is called once per frame
     void Update()
     {
-        if (isMakingMaze)
+        if (setting)
         {
-            makingTime = Time.time;
-
-            int randamSwitch = Random.Range(0, 2);
-
-
-            switch (randamSwitch)
-            {
-                case 0:
-                    searchX = true;
-                    break;
-
-                case 1:
-                    searchX = false;
-                    break;
-            }
-
-            walls = GameObject.FindGameObjectsWithTag("wall");
-            rand = Random.Range(0, 2);
-
-            if (rand == 0)
-            {
-                rand -= 1;
-            }
-            if (!cantX || !cantY)
-            {
-
-                if (searchX)
-                {
-                    if (!invertMath)
-                    {
-                        checkPosX = new Vector3(nowPos.x + rand * 2, nowPos.y, nowPos.z);
-                        nextPos = new Vector3(checkPosX.x - rand, checkPosX.y, checkPosX.z);
-                    }
-                    else
-                    {
-                        checkPosX = new Vector3(nowPos.x - rand * 2, nowPos.y, nowPos.z);
-                        nextPos = new Vector3(checkPosX.x + rand, checkPosX.y, checkPosX.z);
-                    }
-                    for (int j = 0; j < walls.Length; j++)
-                    {
-                     
-                        if (walls[j].transform.position == checkPosX &&
-                            walls[j].transform.position.x != -harfXLIM &&
-                            walls[j].transform.position.y != -quotaYLIM &&
-                            walls[j].transform.position.x != harfXLIM &&
-                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            walls[j].GetComponent<MeshRenderer>().enabled == true)
-
-                        {
-                            for (int i = 0; i < walls.Length; i++)
-                            {
-                                if (walls[i].transform.position == nextPos &&
-                                    walls[i].GetComponent<MeshRenderer>().enabled == true)
-                                {
-                                    debugObj.transform.position = checkPosX;
-                                    walls[i].GetComponent<MeshRenderer>().enabled = false;
-                                    nowPos = checkPosX;
-
-                                    cantX = false;
-                                    break;
-                                }
-                                cantX = true;
-                            }
-                            walls[j].GetComponent<MeshRenderer>().enabled = false;
-
-                            break;
-                        }
-                        else if (!cantX)
-                        {
-                            cantX = true;
-                        }
-                    }
-                    if (cantX)
-                    {
-                        if (!invertMath)
-                        {
-                            invertMath = true;
-                            cantX = false;
-                        }
-                        else
-                        {
-                            invertMath = false;
-                            searchX = false;
-
-                        }
-
-                    }
-                }
-                else
-                {
-                    if (!invertMath)
-                    {
-                        checkPosY = new Vector3(nowPos.x, nowPos.y + rand * 2, nowPos.z);
-                        nextPos = new Vector3(checkPosY.x, checkPosY.y - rand, checkPosY.z);
-                    }
-                    else
-                    {
-                        Debug.Log("checkY");
-
-                        checkPosY = new Vector3(nowPos.x, nowPos.y - rand * 2, nowPos.z);
-                        nextPos = new Vector3(checkPosY.x, checkPosY.y + rand, checkPosY.z);
-                    }
-                    for (int j = 0; j < walls.Length; j++)
-                    {
-                       
-                        if (walls[j].transform.position == checkPosY &&
-                            walls[j].transform.position.x != -harfXLIM &&
-                            walls[j].transform.position.y != -quotaYLIM &&
-                            walls[j].transform.position.x != harfXLIM &&
-                            walls[j].transform.position.y != YLIMIT - 1 - quotaYLIM &&
-                            walls[j].GetComponent<MeshRenderer>().enabled == true)
-
-                        {
-                            for (int i = 0; i < walls.Length; i++)
-                            {
-                                if (walls[i].transform.position == nextPos &&
-                                    walls[i].GetComponent<MeshRenderer>().enabled == true)
-                                {
-                                    debugObj.transform.position = checkPosY;
-                                    walls[i].GetComponent<MeshRenderer>().enabled = false;
-                                    nowPos = checkPosY;
-
-                                    cantY = false;
-                                    break;
-                                }
-                                cantY = true;
-                            }
-                            walls[j].GetComponent<MeshRenderer>().enabled = false;
-
-                            break;
-                        }
-                        else if (!cantY)
-                        {                            
-                            cantY = true;
-                        }
-                    }
-                    if (cantY)
-                    {
-                        if (!invertMath)
-                        {
-                            invertMath = true;
-                            cantY = false;
-                        }
-                        else
-                        {
-                            invertMath = false;
-                            searchX = true;
-
-                        }
-
-                    }
-                }
-            }
-            else
-            {
-                cantPos = nowPos;
-                if (!badWays.Contains(cantPos))
-                {
-                    badWays.Add(cantPos);
-                }
-                for (int i = 0; i < walls.Length; i++)
-                {
-                    if (walls[i].GetComponent<MeshRenderer>().enabled == false &&
-                        walls[i].transform.position.x % 2 == 0 &&
-                        walls[i].transform.position.y % 2 == 0)
-                    {
-
-                        if (!badWays.Contains(walls[i].transform.position) && !removedWays.Contains(walls[i]))
-                        {
-                            if (!goodWays.Contains(walls[i]))
-                            {
-                                goodWays.Add(walls[i]);
-                            }
-                        }
-                        else
-                        {
-                            goodWays.Remove(walls[i]);
-                            if (!removedWays.Contains(walls[i]))
-                            {
-                                removedWays.Add(walls[i]);
-                                Debug.Log(makingTime);
-
-                            }
-                        }
-
-                    }
-                }
-                int randChoice = Random.Range(0, goodWays.Count);
-
-                if (goodWays.Count > 0)
-                {
-                    debugObj.transform.position = goodWays[randChoice].transform.position;
-
-                    nowPos = goodWays[randChoice].transform.position;
-                    //goodWays.Clear();
-                    cantX = false;
-                    cantY = false;
-                }
-                else
-                {
-
-                    cantX = false;
-                    cantY = false;
-                    Debug.Log(makingTime);
-
-                    isMakingMaze = false;
-
-                }
+            callWallMesh();
+        }
+        else if(!setDone)
+        {
+            setDone = true;
+        }
+    }
 
 
-            }
+
+    void callWallMesh()
+    {
+        if (callNum < walls.Length)
+        {
+            walls[callNum].SendMessage("MeshEnable");
+            se.PlayOneShot(loadSE);
+
+            callNum++;
         }
         else
         {
+            se.PlayOneShot(endSE);
+
+            setting = false;
+        }
+
+    }
+
+    void MakeMaze()
+    {
+        //  全てを壁(0)に初期化
+        for (int i = 0; i < mapdata.GetLength(0); i++) 
+        {
+            for (int j = 0; j < mapdata.GetLength(1); j++)
+            {
+                mapdata[i, j] = 0;
+            }
+        }
+        startX = Random.Range(1, XLIMIT / 2) * 2 - 1;
+        startY = Random.Range(1, YLIMIT / 4) * 2 - 1;
+        Dig(startX, startY);
+        SetWall();
+    }
+
+    void Dig(int x,int y)
+    {
+        //渡された値をで道(1)へ
+        mapdata[x, y] = 1;
+        int[] dire = new int[4] { 0, 1, 2, 3 };
+        //なんか有名な配列のシャッフルアルゴリズムを実行
+        for(int i = 0; i < dire.Length; i++)
+        {
+            int rand = Random.Range(0, 4);
+            dire[i] += dire[rand];
+            dire[rand] = dire[i] - dire[rand];
+            dire[i] -= dire[rand];
+        }
+        //探索方向の指定とXYそれぞれをintにキャスト
+        Vector2 direction = Vector2.zero;
+
+        //探索を開始
+        for (int i = 0; i < dire.Length; i++)
+        {
+            switch (dire[i])
+            {
+                case 0:
+                    direction = new Vector2(0, 1);
+                    break;
+                case 1:
+                    direction = new Vector2(1, 0);
+                    break;
+                case 2:
+                    direction = new Vector2(0, -1);
+                    break;
+                case 3:
+                    direction = new Vector2(-1, 0);
+                    break;
+            }
+            int dx = (int)direction.x;
+            int dy = (int)direction.y;
+
+            int xx = x + dx * 2;
+            int yy = y + dy * 2;
+
+
+            //画面端ではなくかつ壁(0)であれば
+            if (0 < xx && xx < XLIMIT && 0 < yy && yy < YLIMIT && mapdata[xx, yy] == 0)
+            {
+                int rand = Random.Range(0, 10);
+                if (!setHero && yy > (YLIMIT / 4) * 3 && rand == 0)
+                {
+                    mapdata[x + dx, y + dy] = 2;
+                    setHero = true;
+                }
+
+                else
+                {
+                    mapdata[x + dx, y + dy] = 1;
+                }
+                Dig(xx, yy);
+            }
+            //ゴール設定
+
         }
     }
+
+
+    //壁をセット
+    void SetWall()
+    {
+        //位置調整用変数
+        int xHarf = XLIMIT / 2;
+        //マップ総当り
+
+        for (int y = 0; y < mapdata.GetLength(1); y++)
+        {
+            for (int x = 0; x < mapdata.GetLength(0); x++)
+            {
+                if (x == XLIMIT / 2 && y == 0)
+                {
+                    mapdata[x, y] = 4;
+                }
+                if (mapdata[x, y] == 4)
+                {
+                    GameObject Goal = Instantiate<GameObject>(this.goal);
+                    Goal.transform.SetParent(transform);
+                    Goal.transform.position = new Vector2(x, y);
+                }
+                //該当座標がfalseで、さらに真ん中の最下部、またはそのひとつ上でなければ
+                if (!(x == xHarf && (y == 0 || y == 1)))
+                {
+                    if(mapdata[x, y] == 0)
+                    {                    //壁をインスタンス化
+                        GameObject Wall = Instantiate<GameObject>(this.wall);
+                        Wall.transform.SetParent(transform);
+                        //位置を真ん中に来るように調整
+                        Wall.transform.position = new Vector2(x, y);
+
+                    }
+                    else if (mapdata[x, y] == 2)
+                    {
+                        heroInst = Instantiate<GameObject>(this.hero);
+                        //位置を真ん中に来るように調整
+                        heroInst.transform.position = new Vector2(x, y);
+                    }
+                }
+
+            }
+        }
+    }
+
 }
